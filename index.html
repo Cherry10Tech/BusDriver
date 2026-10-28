@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BusDriver.wtf — Kannada & Telugu Night Highway Radio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Sans+Kannada:wght@600;700&family=Noto+Sans+Telugu:wght@600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --led-amber: #ffb703;
+      --led-red: #ff2a54;
+      --led-green: #00f5d4;
+    }
+    body {
+      font-family: 'Space Grotesk', 'Noto Sans Kannada', 'Noto Sans Telugu', sans-serif;
+      background-color: #05070d;
+      color: #f8fafc;
+      overflow: hidden;
+      user-select: none;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Glowing LED Matrix Board */
+    .led-board {
+      background: #0c0a09;
+      background-image: radial-gradient(#292524 1px, transparent 0);
+      background-size: 4px 4px;
+      border: 2px solid #27272a;
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.9), 0 0 15px rgba(255, 183, 3, 0.15);
+    }
+    .led-text-amber {
+      color: #ffb703;
+      text-shadow: 0 0 8px rgba(255, 183, 3, 0.8), 0 0 16px rgba(255, 183, 3, 0.4);
+    }
+    .led-text-green {
+      color: #10b981;
+      text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+    }
+    /* Marquee Animation */
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+    .animate-marquee {
+      display: inline-block;
+      white-space: nowrap;
+      animation: marquee 18s linear infinite;
+    }
+    /* Cabin Serial Fairy Lights */
+    @keyframes twinkle {
+      0%, 100% { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
+      50% { opacity: 0.35; filter: drop-shadow(0 0 2px currentColor); }
+    }
+    .serial-light {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      animation: twinkle 1.6s infinite ease-in-out;
+    }
+    /* Bus Bounce Animation */
+    @keyframes busVibe {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-2px); }
+    }
+    .bus-vibe {
+      animation: busVibe 0.45s infinite ease-in-out;
+    }
+    /* Custom Glassmorphism */
+    .cabin-glass {
+      background: rgba(12, 16, 28, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    /* CRT Scanlines Effect */
+    .crt-overlay {
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%),
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.04));
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen flex flex-col justify-between">
+
+  <!-- ================= BACKGROUND VIEW 1: HIGHWAY CANVAS ================= -->
+  <canvas id="highwayCanvas" class="fixed inset-0 w-full h-full z-0"></canvas>
+
+  <!-- ================= VIEW 2: INSIDE CABIN & TV OVERLAY ================= -->
+  <!-- Note: We keep the YouTube container mounted at all times so switching views NEVER interrupts playback! -->
+  <div id="cabinScene" class="fixed inset-0 z-10 pointer-events-none flex flex-col items-center justify-start pt-16 md:pt-20 transition-opacity duration-500 opacity-0">
+    
+    <!-- Dark Cabin Interior Frame -->
+    <div class="fixed inset-0 bg-gradient-to-b from-black/90 via-slate-950/75 to-black/95 -z-10"></div>
+
+    <!-- Top Cabin Serial LED Lights (Torana vibe) -->
+    <div id="serialLightsBar" class="w-full max-w-4xl flex justify-between px-6 py-2"></div>
+
+    <!-- Coach Mounted CRT/LCD TV Unit -->
+    <div class="relative w-[92%] max-w-xl bg-zinc-900 rounded-2xl p-3 md:p-4 border-4 border-zinc-800 shadow-[0_20px_60px_rgba(0,0,0,0.95)] pointer-events-auto bus-vibe">
+      <!-- Top TV Branding & Digital Cabin Clock -->
+      <div class="flex items-center justify-between mb-2 px-1">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+          <span id="cabinCoachBadge" class="mono text-[11px] tracking-widest uppercase text-amber-400 font-bold">KSRTC AIRAVAT VIDEO COACH</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="mono text-xs text-emerald-400 bg-black px-2 py-0.5 rounded border border-emerald-900/60" id="cabinClock">01:42 AM</span>
+          <span class="text-[10px] mono text-zinc-400">CH-01 AV</span>
+        </div>
+      </div>
+
+      <!-- Actual YouTube Video Player Screen -->
+      <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden border-2 border-zinc-950 shadow-inner">
+        <div id="ytPlayerContainer" class="w-full h-full">
+          <div id="yt-player" class="w-full h-full"></div>
+        </div>
+        <!-- Subtle CRT Scanlines -->
+        <div class="crt-overlay absolute inset-0"></div>
+      </div>
+
+      <!-- Bottom TV Bezel Controls & Sticker -->
+      <div class="flex items-center justify-between mt-2.5 px-2 text-[11px] mono text-zinc-400">
+        <div id="cabinBlessing" class="text-amber-300/90 font-semibold">✨ ಶ್ರೀ ಮಂಜುನಾಥ ಸ್ವಾಮಿ ಕೃಪೆ ✨</div>
+        <div class="flex items-center gap-2">
+          <span class="px-1.5 py-0.5 bg-zinc-800 rounded text-[10px] text-zinc-300">DOLBY BASS BOOST</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Driver Partition Silhouette & Windshield Glow at Bottom of Cabin -->
+    <div class="hidden md:flex items-end justify-between w-full max-w-4xl px-12 mt-auto mb-48 opacity-40">
+      <div class="flex flex-col items-center">
+        <!-- Animated Steering Wheel -->
+        <div class="w-24 h-24 rounded-full border-4 border-zinc-500 flex items-center justify-center relative animate-[spin_12s_ease-in-out_infinite_alternate]">
+          <div class="w-full h-1.5 bg-zinc-500"></div>
+          <div class="h-1/2 w-1.5 bg-zinc-500 absolute bottom-0"></div>
+          <div class="w-6 h-6 rounded-full bg-zinc-400"></div>
+        </div>
+        <span class="mono text-[10px] text-zinc-400 mt-1">DRIVER CABIN</span>
+      </div>
+      <div class="mono text-xs text-amber-400/80 border border-amber-500/30 bg-black/70 px-3 py-1 rounded">
+        SPEED LIMIT: 85 KM/H • NIGHT EXPRESS
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TOP NAVIGATION BAR ================= -->
+  <header class="relative z-20 w-full px-3 md:px-6 pt-3 flex flex-wrap items-center justify-between gap-2">
+    
+    <!-- Brand Logo & Route Plate -->
+    <div class="flex items-center gap-3 cabin-glass px-3.5 py-2 rounded-xl">
+      <div class="flex items-center gap-2">
+        <span class="text-xl md:text-2xl">🚌</span>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="font-bold text-base md:text-lg tracking-tight text-white">BusDriver<span class="text-amber-400">.wtf</span></h1>
+            <span id="rtoPlate" class="mono text-[10px] font-extrabold bg-amber-400 text-black px-1.5 py-0.5 rounded">KA-01-F-9999</span>
+          </div>
+          <p id="subTagline" class="text-[11px] text-zinc-400">Late Night South Highway Radio</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Language Toggle: KANNADA vs TELUGU -->
+    <div class="flex items-center gap-1.5 cabin-glass p-1.5 rounded-xl">
+      <button id="btnLangKA" onclick="switchLanguage('kannada')" class="px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 bg-amber-400 text-black shadow-lg">
+        <span>🟡🔴</span> ಕನ್ನಡ (KA)
+      </button>
+      <button id="btnLangTE" onclick="switchLanguage('telugu')" class="px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 text-zinc-300 hover:text-white">
+        <span>🟢🟡</span> తెలుగు (AP/TG)
+      </button>
+    </div>
+
+    <!-- View Switcher: Highway View vs Cabin TV View -->
+    <div class="flex items-center gap-2">
+      <div class="cabin-glass p-1.5 rounded-xl flex items-center gap-1">
+        <button id="btnViewHighway" onclick="switchView('highway')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-emerald-400 text-black">
+          🛣️ Highway View
+        </button>
+        <button id="btnViewCabin" onclick="switchView('cabin')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-zinc-300 hover:text-white">
+          📺 Cabin TV View
+        </button>
+      </div>
+
+      <!-- Passengers Online Badge -->
+      <div class="hidden lg:flex items-center gap-2 cabin-glass px-3 py-2 rounded-xl mono text-xs text-zinc-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span id="passengerCount">42</span> <span id="passengerLabel">Passengers Awake</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= BOTTOM DASHBOARD CONTROL DECK ================= -->
+  <footer class="relative z-20 w-full max-w-4xl mx-auto px-3 pb-3 md:pb-5 mt-auto">
+    <div class="cabin-glass rounded-2xl p-3.5 md:p-5 shadow-2xl border border-white/15">
+      
+      <!-- Row 1: Scrolling LED Destination & Song Matrix Board -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5 mb-3">
+        <!-- Route LED Box -->
+        <div class="md:col-span-5 led-board rounded-lg px-3 py-2 flex items-center justify-between overflow-hidden">
+          <span class="mono text-[10px] uppercase tracking-wider text-zinc-400 shrink-0 mr-2">ROUTE:</span>
+          <div id="ledRouteText" class="text-xs md:text-sm font-bold led-text-amber truncate">
+            ಬೆಂಗಳೂರು ➔ ಮಂಗಳೂರು (NH-75)
+          </div>
+          <button onclick="cycleRoute()" title="Change Highway Route" class="ml-2 text-xs text-zinc-400 hover:text-amber-400 shrink-0">🔄</button>
+        </div>
+
+        <!-- Now Playing Scrolling LED Ticker -->
+        <div class="md:col-span-7 led-board rounded-lg px-3 py-2 overflow-hidden flex items-center relative">
+          <span id="statusDot" class="w-2 h-2 rounded-full bg-amber-400 mr-2.5 shrink-0"></span>
+          <div class="overflow-hidden w-full">
+            <div id="nowPlayingTicker" class="animate-marquee text-xs md:text-sm mono font-semibold led-text-green">
+              PRESS PLAY TO START THE NIGHT BUS ENGINE — HORN OK PLEASE!
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Mood / Era Filter Pills -->
+      <div class="flex items-center justify-between gap-2 overflow-x-auto pb-2 mb-3 no-scrollbar border-b border-white/10">
+        <div class="flex items-center gap-1.5 shrink-0" id="moodFilterBar">
+          <button onclick="filterMood('all')" data-mood="all" class="mood-btn px-3 py-1 rounded-full text-xs font-bold bg-white text-black transition">🔥 All Night Mix</button>
+          <button onclick="filterMood('melody')" data-mood="melody" class="mood-btn px-3 py-1 rounded-full text-xs font-bold bg-zinc-800/90 text-zinc-300 hover:bg-zinc-700 transition">🌙 90s/2000s Melody</button>
+          <button onclick="filterMood('mass')" data-mood="mass" class="mood-btn px-3 py-1 rounded-full text-xs font-bold bg-zinc-800/90 text-zinc-300 hover:bg-zinc-700 transition">⚡ Full Mass Beats</button>
+          <button onclick="filterMood('sad')" data-mood="sad" class="mood-btn px-3 py-1 rounded-full text-xs font-bold bg-zinc-800/90 text-zinc-300 hover:bg-zinc-700 transition">💔 Auto / Heartbreak</button>
+        </div>
+
+        <!-- Custom Song Request & Tracklist Buttons -->
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button onclick="toggleModal('playlistModal')" class="px-2.5 py-1 rounded-lg text-xs mono bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 transition">
+            📼 Cassette List
+          </button>
+          <button onclick="toggleModal('addSongModal')" class="px-2.5 py-1 rounded-lg text-xs mono bg-zinc-800 hover:bg-zinc-700 text-emerald-300 border border-emerald-500/30 transition">
+            + Add YouTube Song
+          </button>
+        </div>
+      </div>
+
+      <!-- Row 3: Main Player Controls + Interactive Highway Quirks -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        
+        <!-- Left: Transport Controls (Prev / Play-Pause / Double-Bell Next) -->
+        <div class="flex items-center gap-2.5">
+          <button onclick="prevTrack()" title="Previous Stop" class="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white transition active:scale-95">
+            ⏮️
+          </button>
+
+          <button id="playPauseBtn" onclick="togglePlay()" class="px-5 h-11 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-sm tracking-wide flex items-center gap-2 shadow-[0_0_20px_rgba(255,183,3,0.4)] transition active:scale-95">
+            <span id="playIcon">▶️</span>
+            <span id="playText">START BANDI</span>
+          </button>
+
+          <button onclick="nextTrackWithBell()" title="Ring Double Bell & Next Song (Space/Right)" class="px-3.5 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center gap-1.5 text-xs font-bold text-zinc-200 border border-white/10 transition active:scale-95">
+            <span>🔔</span>
+            <span id="nextBellLabel">Double Bell (Next)</span>
+          </button>
+        </div>
+
+        <!-- Center: Volume Slider -->
+        <div class="hidden sm:flex items-center gap-2 bg-zinc-900/90 px-3 py-2 rounded-xl border border-white/5">
+          <span class="text-xs">🔊</span>
+          <input id="volumeSlider" type="range" min="0" max="100" value="85" oninput="changeVolume(this.value)" class="w-20 md:w-24 accent-amber-400 cursor-pointer h-1.5 bg-zinc-700 rounded-lg" />
+        </div>
+
+        <!-- Right: Interactive Sound Effects (Horn, Rain, Chai) -->
+        <div class="flex items-center gap-2 ml-auto sm:ml-0">
+          <!-- Air Horn Button -->
+          <button onmousedown="playAirHorn()" ontouchstart="playAirHorn(); event.preventDefault();" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 active:scale-90 transition">
+            <span>📯</span>
+            <span id="hornLabel">Side Please (H)</span>
+          </button>
+
+          <!-- Highway Rain/Wind Ambient Toggle -->
+          <button id="rainBtn" onclick="toggleRainAmbience()" title="Toggle Night Highway Rain & Wind" class="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold border border-white/10 transition">
+            🌧️ <span class="hidden md:inline">Rain</span>
+          </button>
+
+          <!-- Buy Driver a Chai -->
+          <button onclick="toggleModal('chaiModal')" class="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition flex items-center gap-1">
+            <span>☕</span>
+            <span id="chaiLabel" class="hidden md:inline">Chai Kudi</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- ================= MODAL 1: CASSETTE PLAYLIST DRAWER ================= -->
+  <div id="playlistModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="cabin-glass w-full max-w-lg rounded-2xl p-5 border border-white/20 max-h-[80vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10">
+        <div>
+          <h2 class="font-bold text-lg text-amber-400" id="playlistModalTitle">📼 Driver's Cassette Box</h2>
+          <p class="text-xs text-zinc-400">Click any track to play immediately</p>
+        </div>
+        <button onclick="toggleModal('playlistModal')" class="text-zinc-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+      <div id="tracklistContainer" class="overflow-y-auto my-3 space-y-1.5 pr-1 flex-1"></div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 2: ADD CUSTOM YOUTUBE SONG ================= -->
+  <div id="addSongModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="cabin-glass w-full max-w-md rounded-2xl p-5 border border-white/20">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10">
+        <h2 class="font-bold text-lg text-emerald-400">💿 Hand a Pen-Drive to Driver</h2>
+        <button onclick="toggleModal('addSongModal')" class="text-zinc-400 hover:text-white text-xl font-bold">✕</button>
+      </div>
+      <div class="space-y-3 mt-4 text-sm">
+        <div>
+          <label class="block text-xs mono text-zinc-400 mb-1">SONG TITLE & MOVIE</label>
+          <input id="customTitle" type="text" placeholder="e.g., Huttidare Kannada - Akasmika" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
+        </div>
+        <div>
+          <label class="block text-xs mono text-zinc-400 mb-1">YOUTUBE URL OR VIDEO ID</label>
+          <input id="customUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" />
+        </div>
+        <div>
+          <label class="block text-xs mono text-zinc-400 mb-1">MOOD CATEGORY</label>
+          <select id="customMood" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white">
+            <option value="melody">🌙 90s/2000s Melody</option>
+            <option value="mass">⚡ Full Mass Beats</option>
+            <option value="sad">💔 Auto / Heartbreak</option>
+          </select>
+        </div>
+        <button onclick="addCustomSong()" class="w-full py-2.5 bg-emerald-400 hover:bg-emerald-300 text-black font-bold rounded-xl mt-2 transition">
+          Play Song on Bus Stereo Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 3: BUY DRIVER A CHAI ================= -->
+  <div id="chaiModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="cabin-glass w-full max-w-sm rounded-2xl p-6 border border-amber-400/30 text-center">
+      <div class="text-4xl mb-2">☕🚏</div>
+      <h3 class="text-lg font-bold text-amber-400" id="chaiModalHeading">Highway Dhaba Stop!</h3>
+      <p class="text-xs text-zinc-300 mt-1 leading-relaxed" id="chaiModalText">
+        Driving non-stop through the ghats and highways all night! If the playlist gave you nostalgia, buy the driver a hot cutting chai.
+      </p>
+      <div class="my-4 p-4 bg-zinc-900/90 rounded-xl border border-white/10 mono text-xs text-amber-300">
+        Highway Tip Jar Ready<br/>
+        <span class="text-[11px] text-zinc-400">(Replace with your UPI ID / QR link in index.html)</span>
+      </div>
+      <button onclick="toggleModal('chaiModal')" class="w-full py-2 bg-amber-400 text-black font-bold rounded-xl text-xs uppercase tracking-wider">
+        Back to Highway
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= APPLICATION JAVASCRIPT ================= -->
+  <script>
+    /**************************************************************
+     * 1. STATE & REGIONAL CONFIGURATION (KANNADA vs TELUGU)
+     **************************************************************/
+    const STATE_CONFIG = {
+      kannada: {
+        plate: "KA-01-F-9999",
+        coachBadge: "KSRTC AIRAVAT / RAJAHAMSA NIGHT COACH",
+        blessing: "✨ ಶ್ರೀ ಮಂಜುನಾಥ ಸ್ವಾಮಿ ಕೃಪೆ • ಜೈ ಕರ್ನಾಟಕ ಮಾತೆ ✨",
+        hornText: "Side Kiri (H)",
+        chaiText: "Guru, Chai Kudi",
+        nextText: "Double Bell (Next)",
+        busColorPrimary: "#e11d48", // KSRTC Red/White/Gold vibe
+        busColorAccent: "#facc15",
+        milestoneHeader: "NH-48",
+        milestoneCity: "ಹುಬ್ಬಳ್ಳಿ",
+        sceneryType: "karnataka", // Windmills & Western Ghats
+        routes: [
+          "ಬೆಂಗಳೂರು ➔ ಮಂಗಳೂರು (NH-75 Shiradi Ghat)",
+          "ಬೆಂಗಳೂರು ➔ ಹುಬ್ಬಳ್ಳಿ - ಧಾರವಾಡ (NH-48)",
+          "ಬೆಂಗಳೂರು ➔ ಮೈಸೂರು - ಮಡಿಕೇರಿ (NH-275)",
+          "ಬೆಂಗಳೂರು ➔ ಶಿವಮೊಗ್ಗ - ಹೊನ್ನಾವರ (NH-69)"
+        ],
+        tracks: [
+          // Curated Kannada Highway Classics (Official Movie Songs & Jukeboxes)
+          { title: "Anisuthide Yaako Indu — Mungaru Male (Sonu Nigam)", id: "K1X7hH1V2fE", mood: "melody" },
+          { title: "Tagaru Banthu Tagaru — Tagaru (Anthony Daasan)", id: "W9k6N8zV7xU", mood: "mass" },
+          { title: "Ninnindale Ninnindale — Milana (Sonu Nigam)", id: "r2yF3K4P1k0", mood: "melody" },
+          { title: "Jackie Jackie — Jackie (Puneeth Rajkumar, V. Harikrishna)", id: "O3P7R8vL9xM", mood: "mass" },
+          { title: "Paravashanadenu — Paramathma (Sonu Nigam)", id: "t8eF3W6rL0s", mood: "melody" },
+          { title: "Kariya I Love You — Duniya (Rajesh Krishnan)", id: "v4wH7kG9z0c", mood: "sad" },
+          { title: "Belageddu Yaara Mukhava — Kirik Party (Vijay Prakash)", id: "ebz20FHrT44", mood: "melody" },
+          { title: "Singara Siriye — Kantara (Vijay Prakash, Ajaneesh Loknath)", id: "3M3M8qR2h2U", mood: "melody" },
+          { title: "Varaha Roopam — Kantara (Sai Vignesh)", id: "gH_RYRwVrVM", mood: "mass" },
+          { title: "Bombe Helutaite — Raajakumara (Vijay Prakash)", id: "4NRXx6U8ABQ", mood: "melody" },
+          { title: "Yenagali Mundhe Saagu — Mussanje Maathu (Sonu Nigam)", id: "mP6c1w5T8xY", mood: "sad" },
+          { title: "Dr. Rajkumar & Hamsalekha Evergreen Kannada Hit Jukebox", id: "5qap5aO4i9A", mood: "melody" }
+        ]
+      },
+      telugu: {
+        plate: "TS-09-Z-8888",
+        coachBadge: "TGSRTC / APSRTC GARUDA PLUS NIGHT RIDER",
+        blessing: "✨ శ్రీ వేంకటేశ్వర స్వామి ఆశీస్సులతో • తగ్గేదే లే ✨",
+        hornText: "Side Please Anna (H)",
+        chaiText: "Cutting Chai",
+        nextText: "Double Bell (Next)",
+        busColorPrimary: "#10b981", // Garuda Green / Silver vibe
+        busColorAccent: "#38bdf8",
+        milestoneHeader: "NH-65",
+        milestoneCity: "విజయవాడ",
+        sceneryType: "telugu", // Coastal Palms & Highway Dhabas
+        routes: [
+          "హైదరాబాద్ ➔ విజయవాడ (NH-65 Night Rider)",
+          "విశాఖపట్నం ➔ తిరుపతి (NH-16 Coastal Express)",
+          "హైదరాబాద్ ➔ వరంగల్ - ఖమ్మం (Super Luxury)",
+          "విజయవాడ ➔ రాజమండ్రి - వైజాగ్ (Garuda Plus)"
+        ],
+        tracks: [
+          // Curated Telugu Highway Classics (Mani Sharma, DSP, Ilaiyaraaja, Thaman)
+          { title: "Feel My Love — Arya (Devi Sri Prasad, KK)", id: "2nK1bM6N8vE", mood: "sad" },
+          { title: "Nuvvostanante Nenoddantana —Niluvadhamu Ninu Epudaina", id: "x7F9rL2K4pQ", mood: "melody" },
+          { title: "Samajavaragamana — Ala Vaikunthapurramuloo (Sid Sriram)", id: "OCg6BWlAXSw", mood: "melody" },
+          { title: "Butta Bomma — Ala Vaikunthapurramuloo (Armaan Malik)", id: "2mDCVzruYzQ", mood: "melody" },
+          { title: "Ringa Ringa — Arya 2 (Devi Sri Prasad, Priya Himesh)", id: "v9M2kL4P8xW", mood: "mass" },
+          { title: "Oo Antava Mawa — Pushpa (Indravathi Chauhan, DSP)", id: "u_wB6byrl5k", mood: "mass" },
+          { title: "Srivalli — Pushpa (Sid Sriram, Devi Sri Prasad)", id: "hcMzwMrr1tE", mood: "melody" },
+          { title: "My Love Is Gone — Arya 2 (KK, Devi Sri Prasad)", id: "k8P4mR7N2wQ", mood: "sad" },
+          { title: "Inkem Inkem Inkem Kaavaale — Geetha Govindam (Sid Sriram)", id: "VkmXX_jKmZw", mood: "melody" },
+          { title: "Ramuloo Ramulaa — Ala Vaikunthapurramuloo (Anurag Kulkarni)", id: "Bg8Yb9zGYyA", mood: "mass" }
+        ]
+      }
+    };
+
+    let currentLang = 'kannada';
+    let currentView = 'highway'; // 'highway' or 'cabin'
+    let currentMood = 'all';
+    let currentRouteIndex = 0;
+    let filteredTracks = [...STATE_CONFIG.kannada.tracks];
+    let currentTrackIndex = 0;
+    let isPlaying = false;
+    let ytPlayer = null;
+    let isPlayerReady = false;
+
+    /**************************************************************
+     * 2. YOUTUBE IFRAME API SETUP
+     **************************************************************/
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    function onYouTubeIframeAPIReady() {
+      ytPlayer = new YT.Player('yt-player', {
+        height: '100%',
+        width: '100%',
+        videoId: filteredTracks[0].id,
+        playerVars: {
+          autoplay: 0,
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange,
+          onError: onPlayerError
+        }
+      });
+    }
+
+    function onPlayerReady() {
+      isPlayerReady = true;
+      ytPlayer.setVolume(85);
+      renderTracklist();
+      updateNowPlayingUI();
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.PLAYING) {
+        isPlaying = true;
+        updatePlayButtonUI();
+        updateNowPlayingUI();
+      } else if (event.data === YT.PlayerState.PAUSED) {
+        isPlaying = false;
+        updatePlayButtonUI();
+      } else if (event.data === YT.PlayerState.ENDED) {
+        // Automatically ring double bell and move to next highway song
+        nextTrackWithBell();
+      }
+    }
+
+    // If a YouTube video has embedding disabled by its label, smoothly skip to the next track
+    function onPlayerError() {
+      const ticker = document.getElementById('nowPlayingTicker');
+      ticker.textContent = "⚡ RADIO SIGNAL TUNING TO NEXT HIGHWAY STATION...";
+      setTimeout(() => {
+        nextTrack();
+      }, 900);
+    }
+
+    /**************************************************************
+     * 3. PLAYER & DASHBOARD CONTROLS
+     **************************************************************/
+    function togglePlay() {
+      if (!isPlayerReady) return;
+      initAudioContext();
+      if (isPlaying) {
+        ytPlayer.pauseVideo();
+      } else {
+        ytPlayer.playVideo();
+      }
+    }
+
+    function loadAndPlayCurrentTrack() {
+      if (!isPlayerReady || filteredTracks.length === 0) return;
+      const track = filteredTracks[currentTrackIndex];
+      ytPlayer.loadVideoById(track.id);
+      isPlaying = true;
+      updatePlayButtonUI();
+      updateNowPlayingUI();
+      renderTracklist();
+    }
+
+    function nextTrack() {
+      if (filteredTracks.length === 0) return;
+      currentTrackIndex = (currentTrackIndex + 1) % filteredTracks.length;
+      loadAndPlayCurrentTrack();
+    }
+
+    function prevTrack() {
+      if (filteredTracks.length === 0) return;
+      currentTrackIndex = (currentTrackIndex - 1 + filteredTracks.length) % filteredTracks.length;
+      loadAndPlayCurrentTrack();
+    }
+
+    function nextTrackWithBell() {
+      playDoubleBell();
+      nextTrack();
+    }
+
+    function changeVolume(val) {
+      if (isPlayerReady && ytPlayer) {
+        ytPlayer.setVolume(Number(val));
+      }
+    }
+
+    function updatePlayButtonUI() {
+      const icon = document.getElementById('playIcon');
+      const text = document.getElementById('playText');
+      const dot = document.getElementById('statusDot');
+      if (isPlaying) {
+        icon.textContent = "⏸️";
+        text.textContent = "CRUISING";
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-2.5 shrink-0";
+      } else {
+        icon.textContent = "▶️";
+        text.textContent = "START BANDI";
+        dot.className = "w-2 h-2 rounded-full bg-amber-400 mr-2.5 shrink-0";
+      }
+    }
+
+    function updateNowPlayingUI() {
+      const track = filteredTracks[currentTrackIndex];
+      if (!track) return;
+      const langLabel = currentLang === 'kannada' ? 'KANNADA HIGHWAY FM' : 'TELUGU HIGHWAY FM';
+      document.getElementById('nowPlayingTicker').textContent =
+        `🎵 NOW PLAYING [${langLabel}]: ${track.title.toUpperCase()} — [${track.mood.toUpperCase()} VIBE] — PRESS 'H' FOR HORN`;
+    }
+
+    /**************************************************************
+     * 4. LANGUAGE SWITCHER (KANNADA <-> TELUGU) & VIEW SWITCHER
+     **************************************************************/
+    function switchLanguage(lang) {
+      currentLang = lang;
+      const cfg = STATE_CONFIG[lang];
+      currentRouteIndex = 0;
+
+      // Toggle Button Styles
+      const btnKA = document.getElementById('btnLangKA');
+      const btnTE = document.getElementById('btnLangTE');
+      if (lang === 'kannada') {
+        btnKA.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 bg-amber-400 text-black shadow-lg";
+        btnTE.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 text-zinc-300 hover:text-white";
+      } else {
+        btnTE.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 bg-emerald-400 text-black shadow-lg";
+        btnKA.className = "px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 text-zinc-300 hover:text-white";
+      }
+
+      // Update Dashboard Badges & Slang
+      document.getElementById('rtoPlate').textContent = cfg.plate;
+      document.getElementById('ledRouteText').textContent = cfg.routes[0];
+      document.getElementById('cabinCoachBadge').textContent = cfg.coachBadge;
+      document.getElementById('cabinBlessing').textContent = cfg.blessing;
+      document.getElementById('hornLabel').textContent = cfg.hornText;
+      document.getElementById('chaiLabel').textContent = cfg.chaiText;
+
+      // Filter tracks for the chosen language
+      applyMoodFilter(currentMood, true);
+      playDoubleBell();
+    }
+
+    function switchView(view) {
+      currentView = view;
+      const cabinScene = document.getElementById('cabinScene');
+      const btnHighway = document.getElementById('btnViewHighway');
+      const btnCabin = document.getElementById('btnViewCabin');
+
+      if (view === 'cabin') {
+        cabinScene.classList.remove('opacity-0', 'pointer-events-none');
+        cabinScene.classList.add('opacity-100');
+        btnCabin.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-amber-400 text-black shadow";
+        btnHighway.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-zinc-300 hover:text-white";
+      } else {
+        cabinScene.classList.add('opacity-0', 'pointer-events-none');
+        cabinScene.classList.remove('opacity-100');
+        btnHighway.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-emerald-400 text-black shadow";
+        btnCabin.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-zinc-300 hover:text-white";
+      }
+    }
+
+    function cycleRoute() {
+      const routes = STATE_CONFIG[currentLang].routes;
+      currentRouteIndex = (currentRouteIndex + 1) % routes.length;
+      document.getElementById('ledRouteText').textContent = routes[currentRouteIndex];
+    }
+
+    function filterMood(mood) {
+      applyMoodFilter(mood, true);
+    }
+
+    function applyMoodFilter(mood, autoPlayFirst) {
+      currentMood = mood;
+      const allTracks = STATE_CONFIG[currentLang].tracks;
+      filteredTracks = mood === 'all' ? [...allTracks] : allTracks.filter(t => t.mood === mood);
+      if (filteredTracks.length === 0) filteredTracks = [...allTracks];
+      currentTrackIndex = 0;
+
+      // Update Pill UI
+      document.querySelectorAll('.mood-btn').forEach(btn => {
+        if (btn.dataset.mood === mood) {
+          btn.className = "mood-btn px-3 py-1 rounded-full text-xs font-bold bg-white text-black transition";
+        } else {
+          btn.className = "mood-btn px-3 py-1 rounded-full text-xs font-bold bg-zinc-800/90 text-zinc-300 hover:bg-zinc-700 transition";
+        }
+      });
+
+      renderTracklist();
+      if (autoPlayFirst && isPlayerReady) {
+        loadAndPlayCurrentTrack();
+      }
+    }
+
+    /**************************************************************
+     * 5. TRACKLIST & CUSTOM YOUTUBE SONG MODAL
+     **************************************************************/
+    function renderTracklist() {
+      const container = document.getElementById('tracklistContainer');
+      container.innerHTML = '';
+      filteredTracks.forEach((track, idx) => {
+        const active = idx === currentTrackIndex;
+        const item = document.createElement('div');
+        item.onclick = () => {
+          currentTrackIndex = idx;
+          loadAndPlayCurrentTrack();
+          toggleModal('playlistModal');
+        };
+        item.className = `p-2.5 rounded-xl cursor-pointer flex items-center justify-between text-xs transition ${
+          active ? 'bg-amber-400 text-black font-bold' : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200'
+        }`;
+        item.innerHTML = `
+          <div class="flex items-center gap-2.5 truncate pr-2">
+            <span>${active ? '🔊' : '📼'}</span>
+            <span class="truncate">${track.title}</span>
+          </div>
+          <span class="mono text-[10px] uppercase px-2 py-0.5 rounded ${
+            active ? 'bg-black/20 text-black' : 'bg-zinc-800 text-zinc-400'
+          }">${track.mood}</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function extractYouTubeID(input) {
+      const trimmed = input.trim();
+      if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = trimmed.match(regExp);
+      return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    function addCustomSong() {
+      const titleInput = document.getElementById('customTitle').value.trim() || "Custom Highway Request";
+      const urlInput = document.getElementById('customUrl').value.trim();
+      const moodInput = document.getElementById('customMood').value;
+
+      const videoId = extractYouTubeID(urlInput);
+      if (!videoId) {
+        alert("Please enter a valid 11-character YouTube Video ID or YouTube Link!");
+        return;
+      }
+
+      const newTrack = { title: titleInput, id: videoId, mood: moodInput };
+      STATE_CONFIG[currentLang].tracks.unshift(newTrack);
+      applyMoodFilter('all', true);
+      document.getElementById('customTitle').value = '';
+      document.getElementById('customUrl').value = '';
+      toggleModal('addSongModal');
+    }
+
+    function toggleModal(id) {
+      const modal = document.getElementById(id);
+      if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      } else {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    /**************************************************************
+     * 6. WEB AUDIO API SYNTHESIZER (HORN, DOUBLE BELL, RAIN)
+     **************************************************************/
+    let audioCtx = null;
+    let rainNode = null;
+    let isRaining = false;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Multi-tone South Indian Highway Bus Air Horn ("Pa-Pa-Paaa!")
+    function playAirHorn() {
+      initAudioContext();
+      const now = audioCtx.currentTime;
+      const notes = [
+        { f1: 311.13, f2: 392.00, start: 0, dur: 0.14 },
+        { f1: 349.23, f2: 440.00, start: 0.16, dur: 0.14 },
+        { f1: 311.13, f2: 392.00, start: 0.32, dur: 0.45 }
+      ];
+
+      notes.forEach(n => {
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc1.type = 'sawtooth';
+        osc2.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(n.f1, now + n.start);
+        osc2.frequency.setValueAtTime(n.f2, now + n.start);
+
+        gain.gain.setValueAtTime(0.01, now + n.start);
+        gain.gain.exponentialRampToValueAtTime(0.22, now + n.start + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + n.start + n.dur);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc1.start(now + n.start);
+        osc2.start(now + n.start);
+        osc1.stop(now + n.start + n.dur);
+        osc2.stop(now + n.start + n.dur);
+      });
+
+      // Trigger high-beam flash on the highway canvas
+      highBeamFlash = 15;
+    }
+
+    // Conductor's Double Bell ("Tring-Tring!")
+    function playDoubleBell() {
+      initAudioContext();
+      const now = audioCtx.currentTime;
+      [0, 0.18].forEach(offset => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2450, now + offset);
+
+        gain.gain.setValueAtTime(0.25, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.16);
+      });
+    }
+
+    // Highway Rain & Wind Ambience Generator
+    function toggleRainAmbience() {
+      initAudioContext();
+      const btn = document.getElementById('rainBtn');
+      if (!isRaining) {
+        const bufferSize = 2 * audioCtx.sampleRate;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+        const whiteNoise = audioCtx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 950;
+
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.08;
+
+        whiteNoise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        whiteNoise.start(0);
+
+        rainNode = whiteNoise;
+        isRaining = true;
+        btn.className = "px-3 py-2 rounded-xl bg-sky-500 text-black text-xs font-bold transition";
+      } else {
+        if (rainNode) rainNode.stop();
+        rainNode = null;
+        isRaining = false;
+        btn.className = "px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold border border-white/10 transition";
+      }
+    }
+
+    // Keyboard Shortcuts (H = Horn, Space = Play/Pause, V = Toggle View)
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.key.toLowerCase() === 'h') playAirHorn();
+      if (e.key.toLowerCase() === 'v') switchView(currentView === 'highway' ? 'cabin' : 'highway');
+    });
+
+    /**************************************************************
+     * 7. ANIMATED HIGHWAY CANVAS (KARNATAKA vs ANDHRA/TELANGANA)
+     **************************************************************/
+    const canvas = document.getElementById('highwayCanvas');
+    const ctx = canvas.getContext('2d');
+    let roadOffset = 0;
+    let highBeamFlash = 0;
+    let stars = [];
+    let raindrops = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      stars = Array.from({ length: 90 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * (canvas.height * 0.52),
+        r: Math.random() * 1.6 + 0.4,
+        alpha: Math.random()
+      }));
+      raindrops = Array.from({ length: 100 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        len: Math.random() * 18 + 10,
+        speed: Math.random() * 12 + 14
+      }));
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function drawHighwayScene() {
+      const w = canvas.width;
+      const h = canvas.height;
+      const horizonY = h * 0.52;
+      const cfg = STATE_CONFIG[currentLang];
+      const speed = isPlaying ? 7.5 : 1.5;
+      roadOffset = (roadOffset + speed) % 200;
+
+      // 1. Night Sky Gradient
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
+      if (currentLang === 'kannada') {
+        skyGrad.addColorStop(0, '#040711');
+        skyGrad.addColorStop(1, '#1e1b4b'); // Deep Western Ghats indigo
+      } else {
+        skyGrad.addColorStop(0, '#020617');
+        skyGrad.addColorStop(1, '#064e3b'); // Deep Coastal night emerald
+      }
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, horizonY);
+
+      // 2. Twinkling Stars & Moon
+      stars.forEach(s => {
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + Math.sin(Date.now() * 0.003 + s.x) * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Glowing Moon
+      ctx.fillStyle = 'rgba(254, 243, 199, 0.9)';
+      ctx.shadowColor = '#fde68a';
+      ctx.shadowBlur = 25;
+      ctx.beginPath();
+      ctx.arc(w * 0.82, horizonY * 0.32, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // 3. Regional Horizon Silhouettes (Western Ghats + Windmills vs Coastal Palms + Hills)
+      ctx.fillStyle = '#090d16';
+      ctx.beginPath();
+      ctx.moveTo(0, horizonY);
+      for (let x = 0; x <= w; x += 60) {
+        const wave = currentLang === 'kannada'
+          ? Math.sin(x * 0.006) * 35 + Math.cos(x * 0.015) * 20 // High Western Ghats
+          : Math.sin(x * 0.004) * 16 + Math.cos(x * 0.01) * 10; // Flatter Deccan/Coastal plains
+        ctx.lineTo(x, horizonY - 22 - Math.abs(wave));
+      }
+      ctx.lineTo(w, horizonY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Chitradurga Windmills (Karnataka) OR Highway Palms (Telugu)
+      if (currentLang === 'kannada') {
+        [w * 0.2, w * 0.28, w * 0.74].forEach((wx, idx) => {
+          const wy = horizonY - 38;
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(wx, wy + 38);
+          ctx.lineTo(wx, wy);
+          ctx.stroke();
+
+          const angle = (Date.now() * 0.002) + idx;
+          for (let b = 0; b < 3; b++) {
+            const a = angle + (b * (Math.PI * 2 / 3));
+            ctx.beginPath();
+            ctx.moveTo(wx, wy);
+            ctx.lineTo(wx + Math.cos(a) * 18, wy + Math.sin(a) * 18);
+            ctx.stroke();
+          }
+        });
+      }
+
+      // 4. Ground & Perspective Highway Road
+      ctx.fillStyle = '#060911';
+      ctx.fillRect(0, horizonY, w, h - horizonY);
+
+      const roadTopWidth = w * 0.08;
+      const roadBottomWidth = w * 0.9;
+      ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - roadTopWidth / 2, horizonY);
+      ctx.lineTo(w / 2 + roadTopWidth / 2, horizonY);
+      ctx.lineTo(w / 2 + roadBottomWidth / 2, h);
+      ctx.lineTo(w / 2 - roadBottomWidth / 2, h);
+      ctx.closePath();
+      ctx.fill();
+
+      // Highway Side Edge Stripes
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - roadTopWidth / 2, horizonY);
+      ctx.lineTo(w / 2 - roadBottomWidth / 2, h);
+      ctx.moveTo(w / 2 + roadTopWidth / 2, horizonY);
+      ctx.lineTo(w / 2 + roadBottomWidth / 2, h);
+      ctx.stroke();
+
+      // Moving Center Dashed Divider
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([28, 32]);
+      ctx.lineDashOffset = -roadOffset;
+      ctx.beginPath();
+      ctx.moveTo(w / 2, horizonY);
+      ctx.lineTo(w / 2, h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 5. Passing Highway Milestone Stone on Left Side
+      const mProgress = ((roadOffset * 1.5) % 300) / 300;
+      const my = horizonY + mProgress * (h - horizonY);
+      const mx = (w / 2) - (roadTopWidth / 2 + mProgress * (roadBottomWidth - roadTopWidth) / 2) - (30 * mProgress) - 10;
+      const mScale = 0.25 + mProgress * 1.1;
+
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.scale(mScale, mScale);
+      // Milestone Body
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-14, -34, 28, 34);
+      // Top Semi-Circle (Yellow for NH)
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(0, -34, 14, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(cfg.milestoneHeader, 0, -36);
+      ctx.fillText(cfg.milestoneCity, 0, -18);
+      ctx.restore();
+
+      // 6. Stylized Night Bus Cruising at Center-Bottom (In Highway View)
+      const busX = w / 2;
+      const busY = h * 0.67 + (isPlaying ? Math.sin(Date.now() * 0.025) * 2.5 : 0);
+
+      // Headlight Beams Cutting Forward
+      const beamAlpha = highBeamFlash > 0 ? 0.55 : 0.22;
+      if (highBeamFlash > 0) highBeamFlash--;
+      const beamGrad = ctx.createLinearGradient(busX, busY, busX, h);
+      beamGrad.addColorStop(0, `rgba(253, 224, 71, ${beamAlpha})`);
+      beamGrad.addColorStop(1, 'rgba(253, 224, 71, 0)');
+      ctx.fillStyle = beamGrad;
+      ctx.beginPath();
+      ctx.moveTo(busX - 60, busY + 35);
+      ctx.lineTo(busX - 240, h);
+      ctx.lineTo(busX + 240, h);
+      ctx.lineTo(busX + 60, busY + 35);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bus Rear/3D Cabin Silhouette
+      ctx.save();
+      ctx.translate(busX, busY);
+
+      // Bus Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(-75, 42, 150, 12);
+
+      // Bus Main Body
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = cfg.busColorPrimary;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(-70, -45, 140, 88, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      // Livery Stripe
+      ctx.fillStyle = cfg.busColorPrimary;
+      ctx.fillRect(-68, 2, 136, 14);
+      ctx.fillStyle = cfg.busColorAccent;
+      ctx.fillRect(-68, 16, 136, 4);
+
+      // Rear Window with "HORN OK PLEASE" LED Glow
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(-56, -34, 112, 30);
+      ctx.fillStyle = '#ffb703';
+      ctx.font = 'bold 10px JetBrains Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(currentLang === 'kannada' ? '★ ರಾಜಹಂಸ • KA 01 ★' : '★ GARUDA • TS 09 ★', 0, -15);
+
+      // Glowing Red Tail Lights & Amber Indicators
+      ctx.shadowColor = '#ef4444';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(-64, 24, 22, 10);
+      ctx.fillRect(42, 24, 22, 10);
+      ctx.shadowBlur = 0;
+
+      ctx.restore();
+
+      // 7. Rain Overlay on Canvas when Rain Ambience is Active
+      if (isRaining) {
+        ctx.strokeStyle = 'rgba(186, 230, 253, 0.35)';
+        ctx.lineWidth = 1.2;
+        raindrops.forEach(r => {
+          ctx.beginPath();
+          ctx.moveTo(r.x, r.y);
+          ctx.lineTo(r.x - 3, r.y + r.len);
+          ctx.stroke();
+          r.y += r.speed;
+          if (r.y > h) {
+            r.y = -20;
+            r.x = Math.random() * w;
+          }
+        });
+      }
+
+      requestAnimationFrame(drawHighwayScene);
+    }
+
+    /**************************************************************
+     * 8. CABIN FAIRY LIGHTS & DIGITAL CLOCK INITIALIZATION
+     **************************************************************/
+    function initCabinDecor() {
+      const bar = document.getElementById('serialLightsBar');
+      const colors = ['#ff2a54', '#ffb703', '#00f5d4', '#38bdf8', '#a855f7'];
+      for (let i = 0; i < 24; i++) {
+        const bulb = document.createElement('div');
+        bulb.className = 'serial-light';
+        bulb.style.backgroundColor = colors[i % colors.length];
+        bulb.style.color = colors[i % colors.length];
+        bulb.style.animationDelay = `${(i * 0.15).toFixed(2)}s`;
+        bar.appendChild(bulb);
+      }
+
+      // Update Cabin Clock & Fluctuate Live Passenger Count
+      setInterval(() => {
+        const now = new Date();
+        document.getElementById('cabinClock').textContent =
+          now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const base = 38 + Math.floor(Math.random() * 14);
+        document.getElementById('passengerCount').textContent = base;
+      }, 5000);
+    }
+
+    initCabinDecor();
+    drawHighwayScene();
+  </script>
+</body>
+</html>
